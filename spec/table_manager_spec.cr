@@ -124,7 +124,7 @@ module RubberSoul
   def self.table_manager_test_suite(bulk : Bool)
     describe "#{bulk ? "bulk" : "single"}" do
       describe "watch" do
-        it "creates ES documents from changefeed" do
+        it "creates ES documents from changefeed", focus: true do
           Elastic.bulk = bulk
           Programmer.clear
           refresh
@@ -136,13 +136,12 @@ module RubberSoul
 
           prog = Programmer.create!(name: "Rob Pike")
 
-          Fiber.yield
-
           until_expected(1) do
             es_document_count(index)
           end.should be_true
 
-          tm.stop
+          stopped = tm.stop
+          stopped.should be_true
           prog.destroy
 
           until_expected(1) do

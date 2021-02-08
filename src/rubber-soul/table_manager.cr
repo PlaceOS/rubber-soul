@@ -260,13 +260,6 @@ module RubberSoul
       parents = parents(name)
       no_children = children(name).empty?
 
-      changefeed = nil
-      spawn do
-        coordination.receive?
-        Log.warn { {method: "watch_table", message: "table_manager stopped"} }
-        changefeed.try &.stop
-      end
-
       # NOTE: in the event of losing connection, the table is backfilled.
       SimpleRetry.try_to(base_interval: 50.milliseconds, max_elapsed_time: 15.seconds) do |_, exception, _|
         begin
@@ -274,8 +267,22 @@ module RubberSoul
 
           return if coordination.closed?
           changefeed = changes(name)
+
+          discard_changefeed = Channel(Nil).new
+
+          spawn do
+            select
+            when discard_changefeed.receive?
+            when coordination.receive?
+              Log.warn { {method: "watch_table", message: "table_manager stopped"} }
+            end
+
+            changefeed.as(RethinkORM::Base).close
+          end
+
           Log.info { {method: "changes", model: model.to_s} }
-          changefeed.not_nil!.each do |change|
+          changefeed.each do |change|
+            pp! change
             event = change[:event]
             document = change[:value]
             # Asynchronously mutate Elasticsearch
@@ -313,7 +320,7 @@ module RubberSoul
             end
           rescue e
             Log.error(exception: e) { "in watch_table" }
-            changefeed.try &.stop
+            discard_changefeed.close
             raise e
           end
         end
