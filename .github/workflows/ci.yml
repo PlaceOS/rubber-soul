@@ -16,12 +16,13 @@ jobs:
   test:
     runs-on: ubuntu-latest
     continue-on-error: ${{ !matrix.stable }}
-    name: "Test - crystal: ${{ matrix.crystal }}, stable: ${{ matrix.stable }}"
+    name: "Test - crystal: ${{ matrix.crystal }}, bulk: ${{ matrix.bulk }}, stable: ${{ matrix.stable }}"
     strategy:
       matrix:
-        stable: [true]
+        bulk: [true, false]
         crystal:
           - 1.0.0
+        stable: [true]
         include:
           - crystal: nightly
             stable: false
@@ -31,3 +32,4 @@ jobs:
         run: ./test
         env:
           CRYSTAL_VERSION: ${{ matrix.crystal }}
+          ES_DISABLE_BULK: "${{ !matrix.bulk }}"
